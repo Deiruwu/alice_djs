@@ -1,0 +1,40 @@
+# Rust
+/target
+Cargo.lock
+
+# Si es una aplicación/binario normalmente SÍ se commitea Cargo.lock.
+# Si quieres versionarlo, elimina la línea anterior.
+
+# Entorno
+.env
+.env.*
+config.json
+# IDEs
+.idea/
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Configs sensibles/locales
+config.local.json
+secrets.json
+
+# Audio/cache si luego guardas canciones
+music_storage/
+cache/
+downloads/
+
+# Archivos compilados
+*.rlib
+*.rmeta
+
+	
