@@ -4,20 +4,17 @@ mod commands;
 mod config;
 mod microservices;
 mod model;
-mod voice;
 
 use std::sync::Arc;
 use serenity::prelude::*;
-use songbird::SerenityInit; // Importacion vital para el driver de voz
+use songbird::SerenityInit;
 
 use audio::MusicManager;
 use bot::Bot;
-use commands::{PingCommand, SlowPingCommand};
 use commands::CommandRegistry;
 use config::Config;
-use commands::playback::PlayCommand;
+use commands::playback::*;
 
-// Quitamos el limitador current_thread. Songbird requiere multithreading.
 #[tokio::main]
 async fn main() {
     let config = Arc::new(Config::load());
@@ -28,9 +25,14 @@ async fn main() {
              config.resolve_path(&config.paths.music_path));
 
     let mut registry = CommandRegistry::new();
-    registry.register(Box::new(PingCommand));
-    registry.register_async(Box::new(SlowPingCommand));
     registry.register_async(Box::new(PlayCommand));
+    registry.register_async(Box::new(PlayCommand));
+    registry.register_async(Box::new(PlayNextCommand));
+    registry.register_async(Box::new(ClearCommand));
+    registry.register_async(Box::new(QueueCommand));
+    registry.register_async(Box::new(SkipCommand));
+    registry.register_async(Box::new(SkipToCommand));
+    registry.register_async(Box::new(VolumeCommand));
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MESSAGES
@@ -43,7 +45,7 @@ async fn main() {
             registry:      Arc::new(registry),
             music_manager: Arc::new(MusicManager::new(Arc::clone(&config))),
         })
-        .register_songbird() // Registra el estado global de voz
+        .register_songbird()
         .await
         .expect("Error al crear el cliente");
 

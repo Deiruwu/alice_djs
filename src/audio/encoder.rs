@@ -1,17 +1,14 @@
-use songbird::input::{File, Input};
+use songbird::input::{File, Input, RawAdapter};
+use std::io::{Read, Seek, SeekFrom, Result as IoResult};
 use std::path::Path;
+use std::process::{Command, Stdio};
+use symphonia_core::io::MediaSource;
 
-/// Formatos que Discord acepta de forma nativa sin recodificar.
-/// Cualquier otro formato pasara por ffmpeg internamente via songbird.
-const OPUS_NATIVE: &[&str] = &[".ogg", ".opus", ".webm"];
-
-/// Errores del encoder.
 #[derive(Debug)]
 pub enum EncoderError {
-    /// El archivo no existe en el path dado.
     FileNotFound(String),
-    /// La extension del archivo no esta soportada.
     UnsupportedFormat(String),
+    SpawnError(String),
 }
 
 impl std::fmt::Display for EncoderError {
@@ -19,18 +16,41 @@ impl std::fmt::Display for EncoderError {
         match self {
             Self::FileNotFound(p)      => write!(f, "Archivo no encontrado: {}", p),
             Self::UnsupportedFormat(p) => write!(f, "Formato no soportado: {}", p),
+            Self::SpawnError(e)        => write!(f, "Error al lanzar FFmpeg: {}", e),
         }
     }
 }
 
 impl std::error::Error for EncoderError {}
 
-/// Convierte un file_path en un Input listo para songbird.
-///
-/// Formatos nativos (.ogg, .opus, .webm): se entregan directamente.
-/// Resto (.m4a, .flac, mp3, etc.): songbird los pasa por ffmpeg internamente.
-///
-/// REQUISITO: ffmpeg debe estar instalado en el sistema para formatos no nativos.
+// ─── Wrapper MediaSource para streams no seekables ───────────────────────────
+
+struct ReadOnlyMediaSource<R: Read + Send + Sync> {
+    inner: R,
+}
+
+impl<R: Read + Send + Sync> Read for ReadOnlyMediaSource<R> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl<R: Read + Send + Sync> Seek for ReadOnlyMediaSource<R> {
+    fn seek(&mut self, _pos: SeekFrom) -> IoResult<u64> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "stream no seekable",
+        ))
+    }
+}
+
+impl<R: Read + Send + Sync + 'static> MediaSource for ReadOnlyMediaSource<R> {
+    fn is_seekable(&self) -> bool { false }
+    fn byte_len(&self) -> Option<u64> { None }
+}
+
+// ─── API pública ─────────────────────────────────────────────────────────────
+
 pub fn create_input(file_path: &str) -> Result<Input, EncoderError> {
     let path = Path::new(file_path);
 
@@ -44,10 +64,6 @@ pub fn create_input(file_path: &str) -> Result<Input, EncoderError> {
         .map(|e| format!(".{}", e.to_lowercase()))
         .unwrap_or_default();
 
-    // Formatos soportados explicitamente.
-    // .m4a y .flac van por ffmpeg (no son nativos de opus).
-    // FUTURO: cuando symphonia este integrado, los formatos compatibles
-    //         podran ir por symphonia en lugar de ffmpeg.
     let supported = matches!(
         ext.as_str(),
         ".ogg" | ".opus" | ".webm" | ".m4a" | ".flac" | ".mp3" | ".wav"
@@ -57,5 +73,36 @@ pub fn create_input(file_path: &str) -> Result<Input, EncoderError> {
         return Err(EncoderError::UnsupportedFormat(ext));
     }
 
+    // .flac va siempre por FFmpeg para garantizar resample a 48000 Hz.
+    if ext == ".flac" {
+        return spawn_ffmpeg_input(file_path);
+    }
+
     Ok(File::new(file_path.to_string()).into())
+}
+
+// ─── FFmpeg pipe con RawAdapter ───────────────────────────────────────────────
+
+fn spawn_ffmpeg_input(file_path: &str) -> Result<Input, EncoderError> {
+    let mut child = Command::new("ffmpeg")
+        .args([
+            "-i",        file_path,
+            "-f",        "f32le",
+            "-ac",       "2",
+            "-ar",       "48000",
+            "-loglevel", "quiet",
+            "pipe:1",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| EncoderError::SpawnError(e.to_string()))?;
+
+    let stdout = child.stdout.take()
+        .ok_or_else(|| EncoderError::SpawnError("FFmpeg no abrió stdout".to_string()))?;
+
+    let source  = ReadOnlyMediaSource { inner: stdout };
+    let adapter = RawAdapter::new(source, 48000, 2);
+
+    Ok(Input::from(adapter))
 }

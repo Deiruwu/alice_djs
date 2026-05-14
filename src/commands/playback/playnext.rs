@@ -8,33 +8,40 @@ use crate::commands::command_context::CommandContext;
 use crate::commands::traits::AsyncCommand;
 use crate::audio::PlaybackStatus;
 
-pub struct PlayCommand;
+pub struct PlayNextCommand;
 
-impl AsyncCommand for PlayCommand {
-    fn name(&self) -> &str { "play" }
+impl AsyncCommand for PlayNextCommand {
 
-    fn aliases(&self) -> &[&str] { &["p"] }
+    fn name(&self) -> &str { "playnext" }
 
-    fn category(&self) -> &str { "Música" }
+    fn aliases(&self) -> &[&str] {
+        &["pn", "siguiente"]
+    }
+
+    fn category(&self) -> &str {
+        "Música"
+    }
 
     fn description(&self) -> &str {
-        "Busca y reproduce una canción."
+        "Añade una canción al principio de la cola (prioridad)."
     }
 
     fn usage(&self) -> &str {
-        "play <búsqueda o URL>"
+        "playnext <búsqueda o URL>"
     }
 
     fn execute_async<'a>(
         &'a self,
         ctx: &'a CommandContext,
     ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+
         Box::pin(async move {
 
             // ── Validaciones ────────────────────────────────────────────────
 
             let guild_id = match ctx.guild_id {
                 Some(id) => id,
+
                 None => {
                     let _ = ctx.channel_id
                         .say(
@@ -49,6 +56,7 @@ impl AsyncCommand for PlayCommand {
 
             let voice_channel = match ctx.voice_channel_id {
                 Some(id) => id,
+
                 None => {
                     let _ = ctx.channel_id
                         .say(
@@ -65,7 +73,7 @@ impl AsyncCommand for PlayCommand {
                 let _ = ctx.channel_id
                     .say(
                         &ctx.discord_ctx.http,
-                        "Pero dime qué pongo, saranbambich"
+                        "Dime qué canción poner primero."
                     )
                     .await;
 
@@ -83,6 +91,7 @@ impl AsyncCommand for PlayCommand {
                 .expect("Songbird no fue registrado en el cliente");
 
             let handler = match manager.join(guild_id, voice_channel).await {
+
                 Ok(h) => h,
 
                 Err(e) => {
@@ -100,7 +109,7 @@ impl AsyncCommand for PlayCommand {
             // ── Resolver + Encolar ─────────────────────────────────────────
 
             match ctx.music_manager
-                .resolve_and_enqueue(
+                .resolve_and_enqueue_next(
                     guild_id,
                     handler,
                     &query,
@@ -111,6 +120,8 @@ impl AsyncCommand for PlayCommand {
                 .await
             {
                 Ok(status) => {
+                    // ── Embed ──────────────────────────────────────────────
+
                     let embed = match status {
                         PlaybackStatus::PlayingNow(track) => {
                             build_track_embed(TrackEmbedOptions {
@@ -130,18 +141,23 @@ impl AsyncCommand for PlayCommand {
                         }
                     };
 
+                    // ── Enviar mensaje ───────────────────────────────────
+
                     let _ = ctx.channel_id
-                        .send_message(&ctx.discord_ctx.http, CreateMessage::new().embed(embed))
+                        .send_message(
+                            &ctx.discord_ctx.http,
+                            CreateMessage::new().embed(embed),
+                        )
                         .await;
                 }
 
                 Err(e) => {
-                    eprintln!("[ERROR] play: {}", e);
+                    eprintln!("[ERROR] playnext: {}", e);
 
                     let _ = ctx.channel_id
                         .say(
                             &ctx.discord_ctx.http,
-                            format!("Error al reproducir: {}", e)
+                            format!("Error: {}", e)
                         )
                         .await;
                 }
