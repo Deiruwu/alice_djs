@@ -45,7 +45,7 @@ impl EventHandler for TrackEndHandler {
                         requested_by: &queued.requested_by,
                         position:     None,
                         color:        COLOR_PLAYING,
-                        title_prefix: "🎵 Ahora suena",
+                        title_prefix: "🎵 Estás escuchando:",
                     });
 
                     let _ = self.channel_id

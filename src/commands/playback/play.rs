@@ -118,7 +118,7 @@ impl AsyncCommand for PlayCommand {
                                 requested_by: &ctx.author_name,
                                 position:     None,
                                 color:        COLOR_PLAYING,
-                                title_prefix: "🎵 Reproduciendo",
+                                title_prefix: "🎵 Estás escuchando:",
                             })
                         },
                         PlaybackStatus::Enqueued { track, position } => {
