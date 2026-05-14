@@ -46,9 +46,9 @@ pub fn duration_bar(secs: i32) -> String {
 pub struct TrackEmbedOptions<'a> {
     pub track:        &'a Track,
     pub requested_by: &'a str,
-    pub position:     Option<usize>,   // None = reproduciendo ahora
+    pub position:     Option<usize>,
     pub color:        Color,
-    pub title_prefix: &'a str,         // "🎵 Reproduciendo", "⏭ Siguiente en cola", etc.
+    pub title_prefix: &'a str,
 }
 
 pub fn build_track_embed(opts: TrackEmbedOptions<'_>) -> CreateEmbed {
@@ -70,7 +70,7 @@ pub fn build_track_embed(opts: TrackEmbedOptions<'_>) -> CreateEmbed {
 
     // ── Campos principales ────────────────────────────────────────────────────
 
-    embed = embed.field("⏱ Duración", format!("`{}` {}", duration, bar), false);
+    embed = embed.field("⏱ Duración", format!("{}  `{}`", bar, duration), false);
 
     if let Some(ref album) = track.album {
         embed = embed.field("💿 Álbum", &album.name, true);
@@ -99,7 +99,7 @@ pub fn build_track_embed(opts: TrackEmbedOptions<'_>) -> CreateEmbed {
 
     // Footer con quien lo pidió
     embed = embed.footer(
-        CreateEmbedFooter::new(format!("Pedido por {}", requested_by))
+        CreateEmbedFooter::new(format!("Request by {}", requested_by))
     );
 
     embed
