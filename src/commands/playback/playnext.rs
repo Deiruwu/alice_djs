@@ -114,7 +114,9 @@ impl AsyncCommand for PlayNextCommand {
                     handler,
                     &query,
                     ctx.author_name.clone(),
+                    ctx.author_avatar.clone(),
                     ctx.channel_id,
+                    ctx.voice_channel_id.unwrap(),
                     ctx.discord_ctx.http.clone(),
                 )
                 .await
@@ -126,7 +128,8 @@ impl AsyncCommand for PlayNextCommand {
                         PlaybackStatus::PlayingNow(track) => {
                             build_track_embed(TrackEmbedOptions {
                                 track:        &track,
-                                requested_by: &ctx.author_name,
+                                requested_by: &ctx.author_nick.as_ref().unwrap_or(&ctx.author_name),
+                                author_icon_url: ctx.author_avatar.as_deref(),
                                 position:     None,
                                 color:        COLOR_PLAYING,
                                 title_prefix: "🎵 Reproduciendo",
@@ -135,7 +138,8 @@ impl AsyncCommand for PlayNextCommand {
                         PlaybackStatus::Enqueued { track, position } => {
                             build_queue_embed(
                                 &track,
-                                &ctx.author_name,
+                                &ctx.author_nick.as_ref().unwrap_or(&ctx.author_name),
+                                ctx.author_avatar.as_deref(),
                                 position,
                             )
                         }

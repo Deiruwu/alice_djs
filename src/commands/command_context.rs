@@ -9,6 +9,8 @@ pub struct CommandContext {
     pub music_manager: Arc<MusicManager>,
     pub author_id: UserId,
     pub author_name: String,
+    pub author_nick: Option<String>,
+    pub author_avatar: Option<String>,
     pub channel_id: ChannelId,
     pub guild_id: Option<GuildId>,
     pub voice_channel_id: Option<ChannelId>,

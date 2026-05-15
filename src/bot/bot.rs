@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serenity::{
     async_trait,
-    model::{channel::Message, gateway::Ready, voice::VoiceState},
+    model::{channel::Message},
     prelude::*,
 };
 
@@ -55,11 +55,46 @@ impl EventHandler for Bot {
             })
         };
 
+        // ─── Resolución de Identidad ──────────────────────────────────────────────
+        let member = match msg.guild_id {
+            Some(gid) => gid.member(&ctx.http, msg.author.id).await.ok(),
+            None => None,
+        };
+
+        // Nick: preferir el del servidor, caer al global_name, caer al username
+        let author_nick = member
+            .as_ref()
+            .and_then(|m| m.nick.clone())
+            .or_else(|| msg.author.global_name.clone())
+            .unwrap_or_else(|| msg.author.name.clone());
+
+        // Avatar: preferir el del servidor, caer al global
+        let author_avatar = member
+            .as_ref()
+            .and_then(|m| {
+                // Avatar de servidor viene en el Member, no en msg.member (que puede ser parcial)
+                m.avatar.as_ref().map(|hash| {
+                    let hash_str = hash.to_string();
+                    let ext = if hash_str.starts_with("a_") { "gif" } else { "webp" };
+                    format!(
+                        "https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size=1024",
+                        m.guild_id,
+                        msg.author.id,
+                        hash_str,
+                        ext
+                    )
+                })
+            })
+            .or_else(|| msg.author.avatar_url());
+
+        // ─── Despacho ─────────────────────────────────────────────────────────────
         let command_ctx = CommandContext {
             discord_ctx:      ctx,
             music_manager:    Arc::clone(&self.music_manager),
             author_id:        msg.author.id,
-            author_name:      msg.author.name.clone(),
+            author_name:      author_nick,   // ahora es nick > global_name > username
+            author_nick:      member.as_ref().and_then(|m| m.nick.clone()),  // nick puro si lo necesitas
+            author_avatar,
             channel_id:       msg.channel_id,
             guild_id:         msg.guild_id,
             voice_channel_id,

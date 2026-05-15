@@ -13,6 +13,7 @@ use super::music_manager::MusicManager;
 pub struct QueuedTrack {
     pub track: Track,
     pub requested_by: String,
+    pub requester_avatar: Option<String>,
 }
 
 pub struct TrackScheduler {
@@ -26,6 +27,7 @@ pub struct TrackScheduler {
     pub guild_id:      Option<GuildId>,
     /// Canal de texto donde se envían los embeds de "ahora suena".
     pub channel_id:    Option<ChannelId>,
+    pub voice_channel_id: Option<ChannelId>,
     pub http:          Option<Arc<Http>>,
 }
 
@@ -40,6 +42,7 @@ impl TrackScheduler {
             music_manager: None,
             guild_id:      None,
             channel_id:    None,
+            voice_channel_id: None,
             http:          None,
         }
     }
@@ -67,6 +70,7 @@ impl TrackScheduler {
                     music_manager: manager.clone(),
                     guild_id:      *guild_id,
                     channel_id:    *channel_id,
+                    voice_channel_id: self.voice_channel_id,
                     http:          http.clone(),
                 },
             );
@@ -78,8 +82,8 @@ impl TrackScheduler {
 
     // ─── Encolar al final ────────────────────────────────────────────────────
 
-    pub async fn enqueue(&mut self, track: Track, requested_by: String, audio_input: Input) {
-        let queued = QueuedTrack { track, requested_by };
+    pub async fn enqueue(&mut self, track: Track, requested_by: String, requester_avatar: Option<String>, audio_input: Input) {
+        let queued = QueuedTrack { track, requested_by, requester_avatar };
         let was_idle = self.current.is_none();
 
         self.queue.push_back(queued);
@@ -96,8 +100,8 @@ impl TrackScheduler {
 
     // ─── Encolar con prioridad (al frente) ───────────────────────────────────
 
-    pub async fn enqueue_next(&mut self, track: Track, requested_by: String, audio_input: Input) {
-        let queued = QueuedTrack { track, requested_by };
+    pub async fn enqueue_next(&mut self, track: Track, requested_by: String, requester_avatar: Option<String>, audio_input: Input) {
+        let queued = QueuedTrack { track, requested_by, requester_avatar };
 
         if self.current.is_none() {
             // No hay nada sonando — reproducir directamente.

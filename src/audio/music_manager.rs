@@ -44,6 +44,7 @@ impl MusicManager {
         guild_id: GuildId,
         call: Arc<Mutex<Call>>,
         channel_id: ChannelId,
+        voice_channel_id: ChannelId,
         http: Arc<Http>,
     ) -> Arc<Mutex<TrackScheduler>> {
         let mut schedulers = self.schedulers.lock().await;
@@ -62,6 +63,7 @@ impl MusicManager {
                         let mut s = arc_clone.lock().await;
                         s.self_arc        = Some(arc_clone.clone());
                         s.music_manager   = Some(manager_arc.clone());
+                        s.voice_channel_id = Some(voice_channel_id);
                         s.guild_id        = Some(guild_id);
                     });
                 });
@@ -87,7 +89,9 @@ impl MusicManager {
         call: Arc<Mutex<Call>>,
         query: &str,
         requested_by: String,
+        requester_avatar: Option<String>,
         channel_id: ChannelId,
+        voice_channel_id: ChannelId,
         http: Arc<Http>,
     ) -> Result<PlaybackStatus, MusicError> {
         let track = self.client
@@ -97,7 +101,7 @@ impl MusicManager {
 
         let audio_input = self.build_input_public(&track)?;
 
-        let scheduler_arc = self.get_or_create_scheduler(guild_id, call, channel_id, http).await;
+        let scheduler_arc = self.get_or_create_scheduler(guild_id, call, channel_id, voice_channel_id, http).await;
         let mut scheduler = scheduler_arc.lock().await;
 
         // Evaluamos el estado antes de mutar la cola
@@ -110,7 +114,7 @@ impl MusicManager {
             }
         };
 
-        scheduler.enqueue(track, requested_by, audio_input).await;
+        scheduler.enqueue(track, requested_by, requester_avatar, audio_input).await;
 
         Ok(status)
     }
@@ -121,7 +125,9 @@ impl MusicManager {
         call: Arc<Mutex<Call>>,
         query: &str,
         requested_by: String,
+        requester_avatar: Option<String>,
         channel_id: ChannelId,
+        voice_channel_id: ChannelId,
         http: Arc<Http>,
     ) -> Result<PlaybackStatus, MusicError> {
         let track = self.client
@@ -131,7 +137,7 @@ impl MusicManager {
 
         let audio_input = self.build_input_public(&track)?;
 
-        let scheduler_arc = self.get_or_create_scheduler(guild_id, call, channel_id, http).await;
+        let scheduler_arc = self.get_or_create_scheduler(guild_id, call, channel_id, voice_channel_id, http).await;
         let mut scheduler = scheduler_arc.lock().await;
 
         // Evaluamos el estado antes de mutar la cola
@@ -144,7 +150,7 @@ impl MusicManager {
             }
         };
 
-        scheduler.enqueue_next(track, requested_by, audio_input).await;
+        scheduler.enqueue_next(track, requested_by, requester_avatar, audio_input).await;
 
         Ok(status)
     }
