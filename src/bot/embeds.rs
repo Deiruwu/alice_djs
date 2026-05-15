@@ -46,13 +46,14 @@ pub fn duration_bar(secs: i32) -> String {
 pub struct TrackEmbedOptions<'a> {
     pub track:        &'a Track,
     pub requested_by: &'a str,
+    pub author_icon_url: Option<&'a str>,
     pub position:     Option<usize>,
     pub color:        Color,
     pub title_prefix: &'a str,
 }
 
 pub fn build_track_embed(opts: TrackEmbedOptions<'_>) -> CreateEmbed {
-    let TrackEmbedOptions { track, requested_by, position, color, title_prefix } = opts;
+    let TrackEmbedOptions { track, requested_by, author_icon_url, position, color, title_prefix } = opts;
 
     let artists   = fmt_artists(&track.artists);
     let duration  = fmt_duration(track.duration_seconds);
@@ -97,17 +98,18 @@ pub fn build_track_embed(opts: TrackEmbedOptions<'_>) -> CreateEmbed {
         embed = embed.field("📋 Posición en cola", format!("#{}", pos), true);
     }
 
-    // Footer con quien lo pidió
-    embed = embed.footer(
-        CreateEmbedFooter::new(format!("Request by {}", requested_by))
-    );
+    let mut footer = CreateEmbedFooter::new(format!("Request by {}", requested_by));
+    if let Some(icon_url) = author_icon_url {
+        footer = footer.icon_url(icon_url);
+    }
 
-    embed
+    embed.footer(footer)
 }
 
 pub fn build_queue_embed(
     track: &Track,
     requested_by: &str,
+    author_icon_url: Option<&str>,
     position: usize,
 ) -> CreateEmbed {
     let artists  = fmt_artists(&track.artists);
@@ -115,19 +117,21 @@ pub fn build_queue_embed(
 
     let mut embed = CreateEmbed::new()
         .color(COLOR_QUEUED)
-        .title(format!("📋 Añadido a la cola • #{}", position))
+        .title(format!("**{}** — {}", track.title, artists))
         .description(format!(
-            "**{}** — {}\n⏱ `{}`",
-            track.title,
-            artists,
-            duration
+            "Posición en cola: #{} ⏱ `{}`",
+            position.to_string(),
+            duration,
         ));
 
     if let Some(ref thumb) = track.thumbnail_url {
         embed = embed.thumbnail(thumb.clone());
     }
 
-    embed.footer(
-        CreateEmbedFooter::new(format!("Pedido por {}", requested_by))
-    )
+    let mut footer = CreateEmbedFooter::new(format!("Request by {}", requested_by));
+    if let Some(icon_url) = author_icon_url {
+        footer = footer.icon_url(icon_url);
+    }
+
+    embed.footer(footer)
 }
