@@ -8,3 +8,4 @@ mod responses;
 
 pub use music_manager::MusicManager;
 pub use responses::PlaybackStatus;
+pub use track_scheduler::QueuedTrack;

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::model::{Album, Artist};
+use crate::model::{Album, Artist, TrackState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
@@ -13,6 +13,9 @@ pub struct Track {
     pub camelot_key:      Option<String>,   // camelot_key TEXT
     pub file_path:        Option<String>,   // file_path TEXT
     pub added_at:         Option<DateTime<Utc>>, // added_at TIMESTAMPTZ
+
+    #[serde(default)]
+    pub state:            TrackState,        // Usamos el Enum estricto
 
     // ── Relaciones resueltas ──────────────────────────────────────────────────
     pub album:            Option<Album>,    // JOIN albums ON album_id

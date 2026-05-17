@@ -5,6 +5,7 @@ mod queue;
 mod skip;
 mod skipto;
 mod volume;
+mod radio;
 
 pub use play::PlayCommand;
 pub use playnext::PlayNextCommand;
@@ -13,3 +14,4 @@ pub use queue::QueueCommand;
 pub use skip::SkipCommand;
 pub use skipto::SkipToCommand;
 pub use volume::VolumeCommand;
+pub use radio::RadioCommand;

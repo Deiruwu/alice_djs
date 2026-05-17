@@ -10,9 +10,9 @@ use crate::microservices::errors::MicroserviceError;
 
 /// Estructura transitoria para deserializar la respuesta del microservicio Python
 #[derive(Deserialize)]
-struct ResolveResponse {
+struct ApiResponse<T> {
     status: String,
-    data: Option<Track>,
+    data: Option<T>,
     message: Option<String>,
 }
 
@@ -28,7 +28,7 @@ impl MicroserviceClient {
         }
     }
 
-    /// Envia una accion `resolve` con la query dada y devuelve un Vec<Track>.
+    /// Envia una acción `resolve` con la query dada y devuelve un solo Track.
     pub async fn resolve(&self, query: &str) -> Result<Track, MicroserviceError> {
         let payload = json!({
             "action": "resolve",
@@ -37,11 +37,11 @@ impl MicroserviceClient {
 
         let raw = self.send_raw(&payload).await?;
 
-        let response: ResolveResponse = serde_json::from_str(&raw)
-            .map_err(|e| MicroserviceError::InvalidResponse(format!("Fallo parseo: {}. Raw: {}", e, raw)))?;
+        // Deserializamos inyectando `Track` en el genérico
+        let response: ApiResponse<Track> = serde_json::from_str(&raw)
+            .map_err(|e| MicroserviceError::InvalidResponse(format!("Fallo parseo resolve: {}. Raw: {}", e, raw)))?;
 
         if response.status == "ok" {
-            // Extraemos el Track, si es null tiramos error lógico
             response.data.ok_or_else(|| MicroserviceError::ServiceError("El microservicio devolvió ok pero 'data' es null".into()))
         } else {
             Err(MicroserviceError::ServiceError(
@@ -50,7 +50,50 @@ impl MicroserviceClient {
         }
     }
 
-    /// Abre conexion, envia payload, lee UNA SOLA LINEA de respuesta.
+    /// Envía una acción `radio` con la query dada y devuelve una lista de Tracks.
+    pub async fn radio(&self, query: &str) -> Result<Vec<Track>, MicroserviceError> {
+        let payload = json!({
+            "action": "radio",
+            "query": query
+        }).to_string() + "\n";
+
+        let raw = self.send_raw(&payload).await?;
+
+        // Deserializamos inyectando `Vec<Track>` en el genérico
+        let response: ApiResponse<Vec<Track>> = serde_json::from_str(&raw)
+            .map_err(|e| MicroserviceError::InvalidResponse(format!("Fallo parseo radio: {}. Raw: {}", e, raw)))?;
+
+        if response.status == "ok" {
+            response.data.ok_or_else(|| MicroserviceError::ServiceError("El microservicio devolvió ok pero 'data' es null".into()))
+        } else {
+            Err(MicroserviceError::ServiceError(
+                response.message.unwrap_or_else(|| "Error al generar la radio desde el microservicio".into())
+            ))
+        }
+    }
+
+    pub async fn mark_as_played(&self, track_id: &str) -> Result<(), MicroserviceError> {
+        let payload = serde_json::json!({
+            "action": "played",
+            "query": track_id
+        }).to_string() + "\n";
+
+        let raw = self.send_raw(&payload).await?;
+
+        // Parseamos usando serde_json::Value ya que 'data' vendrá vacío o no nos importa
+        let response: ApiResponse<serde_json::Value> = serde_json::from_str(&raw)
+            .map_err(|e| MicroserviceError::InvalidResponse(format!("Fallo parseo en mark_as_played: {}", e)))?;
+
+        if response.status == "ok" {
+            Ok(())
+        } else {
+            Err(MicroserviceError::ServiceError(
+                response.message.unwrap_or_else(|| "Error al registrar el play en el microservicio".into())
+            ))
+        }
+    }
+
+    /// Abre conexión, envía payload, lee UNA SOLA LÍNEA de respuesta.
     async fn send_raw(&self, payload: &str) -> Result<String, MicroserviceError> {
         let mut stream = TcpStream::connect(&self.addr)
             .await
@@ -60,17 +103,13 @@ impl MicroserviceClient {
             .await
             .map_err(MicroserviceError::IoError)?;
 
-        // Envolvemos el stream en un BufReader para poder leer línea por línea
         let mut reader = BufReader::new(stream);
         let mut response = String::new();
 
-        // Lee hasta encontrar un '\n'. No espera a que Python cierre la conexión.
         reader.read_line(&mut response)
             .await
             .map_err(MicroserviceError::IoError)?;
 
-        // Al terminar el scope de esta función, el `stream` hace drop y
-        // Rust cierra la conexión automáticamente (equivalente a socket.destroy() en JS).
         Ok(response.trim().to_string())
     }
 }
